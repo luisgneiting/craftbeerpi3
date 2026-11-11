@@ -46,6 +46,7 @@ class myThread(_Thread):
         self.value = 0
         self.sensor_name = sensor_name
         self.runnig = True
+        self.consecutive_errors = 0
 
     def shutdown(self):
         pass
@@ -66,7 +67,9 @@ class myThread(_Thread):
                     content = content_file.read()
                 if content.split('\n')[0].split(' ')[11] == "YES":
                     self.value = float(content.split("=")[-1]) / 1000
+                    self.consecutive_errors = 0
             except Exception as e:
+                self.consecutive_errors += 1
                 try:
                     app.logger.error("1-wire read error for %s: %s", self.sensor_name, e)
                 except Exception:
@@ -101,6 +104,10 @@ class ONE_WIRE_SENSOR(SensorPassive):
             self.data_received(round(self.t.value + self.offset_value(), 2))
         else:
             self.data_received(round(9.0 / 5.0 * self.t.value + 32 + self.offset_value(), 2))
+
+    def get_value(self):
+        offline = hasattr(self, 't') and self.t.consecutive_errors >= 3
+        return {"value": self.last_value, "unit": self.get_unit(), "offline": offline}
 
     @cbpi.try_catch(0)
     def offset_value(self):
