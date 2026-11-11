@@ -57,10 +57,10 @@ class myThread(_Thread):
         while self.runnig:
             try:
                 if self.sensor_name is None:
-                    _sleep(4)
+                    _sleep(1)
                     continue
                 sensor_path = '/sys/bus/w1/devices/w1_bus_master1/%s/w1_slave' % self.sensor_name
-                # This read blocks for ~750 ms (DS18B20 conversion time).
+                # This read blocks for ~93 ms at 9-bit resolution (set in init_global).
                 # Running in a real OS thread keeps the eventlet event loop responsive.
                 with open(sensor_path, 'r') as content_file:
                     content = content_file.read()
@@ -71,7 +71,7 @@ class myThread(_Thread):
                     app.logger.error("1-wire read error for %s: %s", self.sensor_name, e)
                 except Exception:
                     pass
-            _sleep(4)
+            _sleep(1)
 
 
 @cbpi.sensor
@@ -113,6 +113,22 @@ class ONE_WIRE_SENSOR(SensorPassive):
             call(["modprobe", "w1-therm"])
         except Exception as e:
             pass
+        # Set 9-bit resolution (93 ms conversion time, 0.5°C precision) on all
+        # DS18B20 sensors. The service runs as root so the sysfs write succeeds.
+        # Default 12-bit (750 ms) makes the bus too slow for 4 sensors at 1s intervals.
+        try:
+            w1_root = '/sys/bus/w1/devices'
+            for name in os.listdir(w1_root):
+                if name.startswith('28') or name.startswith('10'):
+                    res_path = os.path.join(w1_root, name, 'resolution')
+                    if os.path.exists(res_path):
+                        with open(res_path, 'w') as f:
+                            f.write('9\n')
+        except Exception as e:
+            try:
+                app.logger.warning("Could not set DS18B20 resolution: %s", e)
+            except Exception:
+                pass
 
 
 @blueprint.route('/<int:t>', methods=['GET'])
