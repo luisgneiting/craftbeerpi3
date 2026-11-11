@@ -48,6 +48,8 @@ class MashStep(StepBase):
         This method is execute in an interval
         :return:
         '''
+        if self.temp is None or self.kettle is None:
+            return
 
         # Check if Target Temp is reached
         if self.get_kettle_temp(self.kettle) >= float(self.temp):

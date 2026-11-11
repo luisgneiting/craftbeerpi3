@@ -44,6 +44,9 @@ class KettleAPI(NotificationAPI):
         return self.api.cache.get("kettle").get(id).target_temp
 
     def set_target_temp(self, temp, id=None):
+        if temp is None:
+            self.notify("Step Error", "Temperature not configured for this step", type="warning")
+            return
         temp = float(temp)
 
         try:
