@@ -1,5 +1,5 @@
 import time
-from flask_classy import route
+from flask_classful import route
 from modules import DBModel, cbpi
 from modules.core.baseview import BaseView
 
@@ -44,5 +44,5 @@ def read_passive_sensor(api):
 
     """
     for key, value in cbpi.cache.get("sensors").items():
-        if value.mode == "P":
+        if getattr(value, "mode", None) == "P":
             value.instance.read()

@@ -1,6 +1,6 @@
 import yaml
 from flask import json, url_for, Response
-from flask_classy import FlaskView, route
+from flask_classful import FlaskView, route
 from git import Repo, Git
 
 from modules.app_config import cbpi
@@ -131,7 +131,7 @@ class SystemView(FlaskView):
 
         with open("config/version.yaml", 'r') as stream:
 
-            y = yaml.load(stream)
+            y = yaml.load(stream, Loader=yaml.SafeLoader)
         pprint.pprint(y)
         pprint.pprint(re)
         return Response(yaml.dump(re), mimetype='text/yaml')

@@ -1,9 +1,16 @@
+import json
+import pprint
+import sys, os
+from flask import Flask, render_template, redirect
+from flask_socketio import SocketIO, emit
+
+import logging
 # Define the WSGI application object
 
+from .app_config import *
 import pprint
 
 from modules.core.db import get_db
-from .app_config import *
 
 
 @app.route('/')
@@ -23,8 +30,8 @@ import modules.actor
 import modules.notification
 import modules.fermenter
 from modules.addon.endpoints import initPlugins
-import modules.ui.endpoints
-import modules.system.endpoints
+import modules.ui
+import modules.system
 import modules.buzzer
 import modules.stats
 import modules.kettle

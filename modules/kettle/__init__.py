@@ -1,5 +1,5 @@
 from flask import request
-from flask_classy import FlaskView, route
+from flask_classful import FlaskView, route
 from modules import cbpi, socketio
 from modules.core.baseview import BaseView
 from modules.core.db import DBModel

@@ -1,5 +1,5 @@
 from flask import request, json
-from flask_classy import route, FlaskView
+from flask_classful import route, FlaskView
 from modules import cbpi
 
 

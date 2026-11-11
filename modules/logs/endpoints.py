@@ -1,7 +1,7 @@
 import datetime
 import os
 from flask import Blueprint, request, send_from_directory, json
-from flask_classy import FlaskView, route
+from flask_classful import FlaskView, route
 from modules import cbpi
 
 

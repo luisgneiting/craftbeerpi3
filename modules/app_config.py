@@ -1,8 +1,7 @@
-
-import json
+import json as _json
 import sys, os
-from flask import Flask, render_template, redirect, json, g
-
+from flask import Flask, render_template, redirect, g
+from flask.json.provider import DefaultJSONProvider
 
 from flask_socketio import SocketIO, emit
 
@@ -13,21 +12,21 @@ from modules.core.db import DBModel
 
 app = Flask(__name__)
 
-FORMAT = '%(asctime)-15s - %(levelname)s - %(message)s'
+FORMAT = "%(asctime)-15s - %(levelname)s - %(message)s"
 
-logging.basicConfig(filename='./logs/app.log',level=logging.INFO, format=FORMAT)
-app.config['SECRET_KEY'] = 'craftbeerpi'
-app.config['UPLOAD_FOLDER'] = './upload'
+logging.basicConfig(filename="./logs/app.log",level=logging.INFO, format=FORMAT)
+app.config["SECRET_KEY"] = "craftbeerpi"
+app.config["UPLOAD_FOLDER"] = "./upload"
 
 
 @app.teardown_appcontext
 def close_connection(exception):
-    db = getattr(g, '_database', None)
+    db = getattr(g, "_database", None)
     if db is not None:
         db.close()
 
 
-class ComplexEncoder(json.JSONEncoder):
+class ComplexProvider(DefaultJSONProvider):
     def default(self, obj):
         try:
             if isinstance(obj, DBModel):
@@ -40,12 +39,14 @@ class ComplexEncoder(json.JSONEncoder):
                 return obj()
             else:
                 return None
-        except TypeError as e:
+        except TypeError:
             pass
-        return None
+        return super().default(obj)
 
-app.json_encoder = ComplexEncoder
-socketio = SocketIO(app, json=json, logging=False)
+app.json_provider_class = ComplexProvider
+app.json = ComplexProvider(app)
+
+socketio = SocketIO(app, logging=False)
 cbpi   = CraftBeerPi(app, socketio)
 
 app.logger.info("##########################################")

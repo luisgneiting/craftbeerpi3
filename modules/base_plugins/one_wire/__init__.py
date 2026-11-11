@@ -13,6 +13,17 @@ blueprint = Blueprint('one_wire', __name__)
 
 temp = 22
 
+# Use the unpatched Thread and sleep so sensor reads happen in real OS threads
+# and don't block eventlet's cooperative event loop.
+try:
+    from eventlet.patcher import original as _orig
+    _Thread = _orig('threading').Thread
+    _sleep = _orig('time').sleep
+except (ImportError, AttributeError):
+    _Thread = threading.Thread
+    _sleep = time.sleep
+
+
 def getSensors():
     try:
         arr = []
@@ -25,15 +36,13 @@ def getSensors():
         return []
 
 
-
-
-class myThread (threading.Thread):
+class myThread(_Thread):
 
     value = 0
 
-
     def __init__(self, sensor_name):
-        threading.Thread.__init__(self)
+        _Thread.__init__(self)
+        self.daemon = True
         self.value = 0
         self.sensor_name = sensor_name
         self.runnig = True
@@ -45,23 +54,24 @@ class myThread (threading.Thread):
         self.runnig = False
 
     def run(self):
-
         while self.runnig:
             try:
-                app.logger.info("READ TEMP")
-                ## Test Mode
                 if self.sensor_name is None:
-                    return
-                with open('/sys/bus/w1/devices/w1_bus_master1/%s/w1_slave' % self.sensor_name, 'r') as content_file:
+                    _sleep(4)
+                    continue
+                sensor_path = '/sys/bus/w1/devices/w1_bus_master1/%s/w1_slave' % self.sensor_name
+                # This read blocks for ~750 ms (DS18B20 conversion time).
+                # Running in a real OS thread keeps the eventlet event loop responsive.
+                with open(sensor_path, 'r') as content_file:
                     content = content_file.read()
-                    if (content.split('\n')[0].split(' ')[11] == "YES"):
-                        temp = float(content.split("=")[-1]) / 1000  # temp in Celcius
-                        self.value = temp
-            except:
-                pass
-
-            time.sleep(4)
-
+                if content.split('\n')[0].split(' ')[11] == "YES":
+                    self.value = float(content.split("=")[-1]) / 1000
+            except Exception as e:
+                try:
+                    app.logger.error("1-wire read error for %s: %s", self.sensor_name, e)
+                except Exception:
+                    pass
+            _sleep(4)
 
 
 @cbpi.sensor
@@ -95,7 +105,7 @@ class ONE_WIRE_SENSOR(SensorPassive):
     @cbpi.try_catch(0)
     def offset_value(self):
         return float(self.offset)
-            
+
     @classmethod
     def init_global(self):
         try:
@@ -114,5 +124,4 @@ def set_temp(t):
 
 @cbpi.initalizer()
 def init(cbpi):
-
     cbpi.app.register_blueprint(blueprint, url_prefix='/api/one_wire')

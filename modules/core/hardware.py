@@ -40,6 +40,7 @@ class Base(object):
 
 
 class SensorBase(Base):
+
     last_value = 0
 
     def init(self):
@@ -49,6 +50,7 @@ class SensorBase(Base):
         print("STOP SENSOR")
 
     def data_received(self, data):
+
 
         self.last_value = data
         self.api.receive_sensor_value(self.id, data)
@@ -63,11 +65,12 @@ class SensorBase(Base):
 
         return {"value": self.last_value, "unit": self.get_unit()}
 
-
 class SensorActive(SensorBase):
+
     __running = False
 
     def is_running(self):
+
         return self.__running
 
     def init(self):
@@ -75,6 +78,7 @@ class SensorActive(SensorBase):
 
     def stop(self):
         self.__running = False
+
 
     def execute(self):
         pass

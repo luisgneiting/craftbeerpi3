@@ -6,7 +6,7 @@ from flask import make_response, g
 import datetime
 from datetime import datetime
 from flask.views import MethodView
-from flask_classy import FlaskView, route
+from flask_classful import FlaskView, route
 
 from time import localtime, strftime
 from functools import wraps, update_wrapper
@@ -141,7 +141,7 @@ class SensorAPI(object):
         except Exception as e:
 
             self.notify("Sensor Error", "Failed to setup Sensor %s. Please check the configuraiton" % value.name, type="danger", timeout=None)
-            self.app.logger.error("Initializing of Sensor %s failed" % id)
+            self.app.logger.exception("Initializing of Sensor %s failed" % id)
 
     def receive_sensor_value(self, id, value):
         self.emit("SENSOR_UPDATE", self.cache.get("sensors")[id])
@@ -159,7 +159,7 @@ class SensorAPI(object):
         filename = "./logs/action.log"
         formatted_time = strftime("%Y-%m-%d %H:%M:%S", localtime())
         with open(filename, "a") as file:
-            text = text.encode("utf-8")
+            # text already unicode in Python 3
             file.write("%s,%s\n" % (formatted_time, text))
 
     def shutdown_sensor(self, id):
@@ -309,7 +309,10 @@ class CraftBeerPi(ActorAPI, SensorAPI):
     def actor2(self, description="", power=True, **options):
 
         def decorator(f):
-
+            print(f())
+            print(f)
+            print(options)
+            print(description)
             return f
         return decorator
 
@@ -375,12 +378,12 @@ class CraftBeerPi(ActorAPI, SensorAPI):
 
 
     # Event Bus
-    def event(self, name, async=False):
+    def event(self, name, run_async=False):
 
         def real_decorator(function):
             if self.eventbus.get(name) is None:
                 self.eventbus[name] = []
-            self.eventbus[name].append({"function": function, "async": async})
+            self.eventbus[name].append({"function": function, "run_async": run_async})
             def wrapper(*args, **kwargs):
                 return function(*args, **kwargs)
             return wrapper
@@ -391,7 +394,7 @@ class CraftBeerPi(ActorAPI, SensorAPI):
 
     def emit_event(self, name, **kwargs):
         for i in self.eventbus.get(name, []):
-            if i["async"] is False:
+            if i["run_async"] is False:
                 i["function"](**kwargs)
             else:
                 t = self.socketio.start_background_task(target=i["function"], **kwargs)
