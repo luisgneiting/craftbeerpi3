@@ -70,10 +70,17 @@ class myThread(_Thread):
                     self.consecutive_errors = 0
             except Exception as e:
                 self.consecutive_errors += 1
-                try:
-                    app.logger.error("1-wire read error for %s: %s", self.sensor_name, e)
-                except Exception:
-                    pass
+                # Log first failure immediately, then throttle to once every 5 min
+                # (300 iterations at 1 s each). Prevents a permanently-offline sensor
+                # from writing ~86 400 errors/day and filling the SD card.
+                if self.consecutive_errors == 1 or self.consecutive_errors % 300 == 0:
+                    try:
+                        app.logger.error(
+                            "1-wire read error for %s: %s (consecutive failures: %d)",
+                            self.sensor_name, e, self.consecutive_errors,
+                        )
+                    except Exception:
+                        pass
             _sleep(1)
 
 

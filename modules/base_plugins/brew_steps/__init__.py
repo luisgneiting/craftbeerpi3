@@ -1,10 +1,31 @@
 # -*- coding: utf-8 -*-
 import time
-
+import logging
+import os
 
 from modules.core.props import Property, StepProperty
 from modules.core.step import StepBase
 from modules import cbpi
+
+_elog = logging.getLogger("step_events")
+if not _elog.handlers:
+    _h = logging.FileHandler(os.path.join(os.path.dirname(__file__), "../../../logs/step_events.log"))
+    _h.setFormatter(logging.Formatter("%(asctime)s,%(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+    _elog.addHandler(_h)
+    _elog.setLevel(logging.INFO)
+
+def _log_event(step, event, reason="", extra=""):
+    try:
+        kettle_temp = ""
+        if hasattr(step, "kettle") and step.kettle:
+            v = step.get_kettle_temp(step.kettle)
+            kettle_temp = "kettle_temp=%.1f" % float(v) if v is not None else "kettle_temp=N/A"
+        target = "target=%s" % step.temp if hasattr(step, "temp") else ""
+        timer = "timer=%smin" % step.timer if hasattr(step, "timer") else ""
+        parts = [p for p in [kettle_temp, target, timer, extra] if p]
+        _elog.info("%-20s %-18s %s %s" % (step.name, event, reason, " | ".join(parts)))
+    except Exception:
+        pass
 
 
 
@@ -23,8 +44,10 @@ class MashStep(StepBase):
         Initialize Step. This method is called once at the beginning of the step
         :return:
         '''
-        # set target tep
+        self.stop_timer()  # clear stale timer_end from previous run to prevent instant completion
         self.set_target_temp(self.temp, self.kettle)
+        self.kettle_on(self.kettle)
+        _log_event(self, "STEP_START", "MashStep")
 
     @cbpi.action("Start Timer Now")
     def start(self):
@@ -41,6 +64,7 @@ class MashStep(StepBase):
         self.set_target_temp(self.temp, self.kettle)
 
     def finish(self):
+        self.stop_timer()
         self.set_target_temp(0, self.kettle)
 
     def execute(self):
@@ -50,15 +74,20 @@ class MashStep(StepBase):
         '''
         if self.temp is None or self.kettle is None:
             return
+        current_temp = self.get_kettle_temp(self.kettle)
+        if current_temp is None:
+            return
 
         # Check if Target Temp is reached
-        if self.get_kettle_temp(self.kettle) >= float(self.temp):
+        if current_temp >= float(self.temp):
             # Check if Timer is Running
             if self.is_timer_finished() is None:
                 self.start_timer(int(self.timer) * 60)
+                _log_event(self, "TIMER_START", "temp_reached")
 
         # Check if timer finished and go to next step
         if self.is_timer_finished() == True:
+            _log_event(self, "STEP_COMPLETE", "timer_expired")
             self.notify("Mash Step Completed!", "Starting the next step", timeout=None)
             self.next()
 
@@ -82,20 +111,24 @@ class MashInStep(StepBase):
         Initialize Step. This method is called once at the beginning of the step
         :return:
         '''
-        # set target tep
         self.s = False
+        self.stop_timer()
         self.set_target_temp(self.temp, self.kettle)
-
-
+        self.kettle_on(self.kettle)
 
     def execute(self):
         '''
         This method is execute in an interval
         :return:
         '''
+        if self.temp is None or self.kettle is None:
+            return
+        current_temp = self.get_kettle_temp(self.kettle)
+        if current_temp is None:
+            return
 
         # Check if Target Temp is reached
-        if self.get_kettle_temp(self.kettle) >= float(self.temp) and self.s is False:
+        if current_temp >= float(self.temp) and self.s is False:
             self.s = True
             self.notify("Step Temp Reached!", "Please press the next button to continue", timeout=None)
 
@@ -178,11 +211,10 @@ class BoilStep(StepBase):
         Initialize Step. This method is called once at the beginning of the step
         :return:
         '''
-        # set target tep
+        self.stop_timer()  # clear stale timer_end from previous run
         self.set_target_temp(self.temp, self.kettle)
-
-
-
+        self.kettle_on(self.kettle)
+        _log_event(self, "STEP_START", "BoilStep")
 
     @cbpi.action("Start Timer Now")
     def start(self):
@@ -199,8 +231,8 @@ class BoilStep(StepBase):
         self.set_target_temp(self.temp, self.kettle)
 
     def finish(self):
+        self.stop_timer()
         self.set_target_temp(0, self.kettle)
-
 
     def check_hop_timer(self, number, value):
 
@@ -214,11 +246,17 @@ class BoilStep(StepBase):
         This method is execute in an interval
         :return:
         '''
+        if self.temp is None or self.kettle is None:
+            return
+        current_temp = self.get_kettle_temp(self.kettle)
+        if current_temp is None:
+            return
         # Check if Target Temp is reached
-        if self.get_kettle_temp(self.kettle) >= float(self.temp):
+        if current_temp >= float(self.temp):
             # Check if Timer is Running
             if self.is_timer_finished() is None:
                 self.start_timer(int(self.timer) * 60)
+                _log_event(self, "TIMER_START", "temp_reached")
             else:
                 self.check_hop_timer(1, self.hop_1)
                 self.check_hop_timer(2, self.hop_2)
@@ -227,5 +265,6 @@ class BoilStep(StepBase):
                 self.check_hop_timer(5, self.hop_5)
         # Check if timer finished and go to next step
         if self.is_timer_finished() == True:
+            _log_event(self, "STEP_COMPLETE", "timer_expired")
             self.notify("Boil Step Completed!", "Starting the next step", timeout=None)
             self.next()
