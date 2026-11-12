@@ -53,6 +53,14 @@ class GPIOPWM(ActorBase):
         if self.frequency is None:
             self.frequency = 0.5  # 2 sec
 
+        # Stop the existing PWM instance before creating a new one to avoid
+        # "RuntimeError: GPIO already in use" on repeated on() calls (#242)
+        if self.p is not None:
+            try:
+                self.p.stop()
+            except Exception:
+                pass
+
         self.p = GPIO.PWM(int(self.gpio), float(self.frequency))
         self.p.start(int(self.power))
 
@@ -60,15 +68,17 @@ class GPIOPWM(ActorBase):
         '''
         Optional: Set the power of your actor
         :param power: int value between 0 - 100
-        :return: 
+        :return:
         '''
         if power is not None:
             self.power = int(power)
-        self.p.ChangeDutyCycle(self.power)
+        if self.p is not None:
+            self.p.ChangeDutyCycle(self.power)
 
     def off(self):
-        print("GPIO OFF")
-        self.p.stop()
+        if self.p is not None:
+            self.p.stop()
+            self.p = None
 
 
 @cbpi.actor

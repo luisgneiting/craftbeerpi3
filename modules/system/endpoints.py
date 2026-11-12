@@ -13,7 +13,7 @@ class SystemView(FlaskView):
     def doShutdown(self):
         time.sleep(5)
         from subprocess import call
-        call("halt")
+        call(["halt"])
 
     @route('/shutdown', methods=['POST'])
     def shutdown(self):
@@ -28,7 +28,7 @@ class SystemView(FlaskView):
     def doReboot(self):
         time.sleep(5)
         from subprocess import call
-        call("reboot")
+        call(["reboot"])
 
     @route('/reboot', methods=['POST'])
     def reboot(self):
@@ -53,25 +53,34 @@ class SystemView(FlaskView):
 
     @route('/git/status', methods=['GET'])
     def git_status(self):
-        repo = Repo('./')
-        o = repo.remotes.origin
-        o.fetch()
-        # Tags
+        try:
+            repo = Repo('./')
+        except Exception as e:
+            return json.dumps({"error": str(e), "tags": [], "headcommit": "", "branchname": None, "master": {"changes": []}})
+        try:
+            o = repo.remotes.origin
+            o.fetch()
+        except Exception:
+            pass
         tags = []
         for t in repo.tags:
-            tags.append({"name": t.name, "commit": str(t.commit), "date": t.commit.committed_date,
-                         "committer": t.commit.committer.name, "message": t.commit.message})
+            try:
+                tags.append({"name": t.name, "commit": str(t.commit), "date": t.commit.committed_date,
+                             "committer": t.commit.committer.name, "message": t.commit.message})
+            except Exception:
+                pass
         try:
             branch_name = repo.active_branch.name
-            # test1
-        except:
+        except Exception:
             branch_name = None
 
         changes = []
-        commits_behind = repo.iter_commits('master..origin/master')
-
-        for c in list(commits_behind):
-            changes.append({"committer": c.committer.name, "message": c.message})
+        try:
+            commits_behind = repo.iter_commits('master..origin/master')
+            for c in list(commits_behind):
+                changes.append({"committer": c.committer.name, "message": c.message})
+        except Exception:
+            pass
 
         return json.dumps({"tags": tags, "headcommit": str(repo.head.commit), "branchname": branch_name,
                            "master": {"changes": changes}})

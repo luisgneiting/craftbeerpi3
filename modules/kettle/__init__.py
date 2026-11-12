@@ -63,7 +63,10 @@ class Kettle2View(BaseView):
             cbpi.emit("UPDATE_KETTLE", cbpi.cache.get("kettle").get(id))
         else:
             # Stop controller
-            kettle.instance.stop()
+            try:
+                kettle.instance.stop()
+            except Exception:
+                pass
             kettle.state = not kettle.state
             cbpi.emit("UPDATE_KETTLE", cbpi.cache.get("kettle").get(id))
         return ('', 204)
